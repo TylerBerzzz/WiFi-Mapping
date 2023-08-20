@@ -1,8 +1,14 @@
 package com.example.wifimapping;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
+import android.Manifest;
 import android.content.Context;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
@@ -18,10 +24,31 @@ public class MainActivity extends AppCompatActivity {
     private TextView networkID;
     private TextView networkName;
     private TextView networkLevel;
+    private  TextView GPSnum;
+
+    //GPS
+    private LocationManager locationManager;
+    private LocationListener locationListener;
 
     //Handlers allows you to send and process Message and Runnable objects associated with a thread's MessageQueue
     private Handler wifiStrengthHandler = new Handler();
     private boolean isCheckingWifiStrength = false;
+    private boolean isCheckingGPS = false;
+
+    //GPS Information Handlers
+    @Override
+    public void  onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 1) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                    locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 500, 0, locationListener);
+                }
+            } else {
+                Toast.makeText(this, "Location permission denied!", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +59,10 @@ public class MainActivity extends AppCompatActivity {
         networkID = findViewById(R.id.networkID); // Initialize the TextView
         networkName = findViewById(R.id.networkRSSI); // Initialize the TextView
         networkLevel = findViewById(R.id.networkLevel); // Initialize the TextView
+        GPSnum = findViewById(R.id.GPS); // Initialize the TextView
+
+        //Initialize GPS
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
         //Initialize the buttons
         Button initiateButton = findViewById(R.id.start1);
@@ -44,8 +75,14 @@ public class MainActivity extends AppCompatActivity {
                 //upon clicked, check if there is an established WiFi connection
                 if (!isCheckingWifiStrength) {
                     isCheckingWifiStrength = true;
+                    isCheckingGPS =  true;
                     //If there is WiFi, check the strength
                     checkWifiStrength();
+                    try {
+                        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 500, 0, locationListener);
+                    } catch (SecurityException e) {
+                        Toast.makeText(MainActivity.this, "Permission denied!", Toast.LENGTH_SHORT).show();
+                    }
                     //Make a toast to show the user something happened
                     Toast.makeText(MainActivity.this, "Started WiFi check!", Toast.LENGTH_SHORT).show();
 
@@ -61,10 +98,14 @@ public class MainActivity extends AppCompatActivity {
                 networkID.setText("null");
                 networkName.setText("null");
                 networkLevel.setText("null");
+                GPSnum.setText("null");
                 //Set checking for wifi to false
                 isCheckingWifiStrength = false;
+                isCheckingGPS = false;
                 //remove the callback
                 wifiStrengthHandler.removeCallbacksAndMessages(null);
+
+                locationManager.removeUpdates(locationListener);
                 //Tell the user the process is stopped
                 Toast.makeText(MainActivity.this, "Stopped WiFi check!", Toast.LENGTH_SHORT).show();
             }
@@ -91,5 +132,23 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }, 500); // Updating every 500 milliseconds
+        locationListener = new LocationListener() {
+            @Override
+            public void onLocationChanged(Location location) {
+                if(isCheckingGPS=true) {
+                    TextView gpsTextView = findViewById(R.id.GPS);
+                    gpsTextView.setText("Lat: " + location.getLatitude() + ", Lon: " + location.getLongitude());
+                }
+            }
+
+            @Override
+            public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+            @Override
+            public void onProviderEnabled(String provider) {}
+
+            @Override
+            public void onProviderDisabled(String provider) {}
+        };
     }
-    }
+}
