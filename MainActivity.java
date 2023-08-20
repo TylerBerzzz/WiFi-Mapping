@@ -20,6 +20,13 @@ import android.widget.TextView;
 import android.widget.Toast; //this is for showing on-screen messages
 import android.widget.Button; //Required for the button class
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
+import java.util.Date;
+
+
 public class MainActivity extends AppCompatActivity {
     //Declare the textviews from activity_main
     private TextView networkID;
@@ -37,7 +44,11 @@ public class MainActivity extends AppCompatActivity {
 
     //Private boolean states
     private boolean startState = false; //track the state of start/stop operation
-    private boolean isCheckingGPS = false;
+    private boolean wifiVal = false;
+    private boolean gpsVal = false;
+
+    private String filename;
+    private String timestamp;
 
     //GPS Information Handlers
     @Override
@@ -77,24 +88,29 @@ public class MainActivity extends AppCompatActivity {
         initiateButton.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v){
+                //Change the button state to true
+                startState = true;
+                //Upon click, create a new file
+                fileCreate();
                 //upon clicked, check if there is an established WiFi connection
                 if (!isCheckingWifiStrength) {
                     isCheckingWifiStrength = true;
-                    isCheckingGPS =  true;
                     //Set GPS text to "Pending"
                     GPSnum.setVisibility(View.VISIBLE);
                     GPSnum.setText("Pending");
+
                     //If there is WiFi, check the strength
                     checkWifiStrength();
+
                     try {
                         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 500, 0, locationListener);
                     } catch (SecurityException e) {
                         Toast.makeText(MainActivity.this, "Permission denied!", Toast.LENGTH_SHORT).show();
                     }
+
                     //Make a toast to show the user something happened
                     Toast.makeText(MainActivity.this, "Started WiFi check!", Toast.LENGTH_SHORT).show();
-                    //Change the button state to true
-                    startState = true;
+
 
                 }
 
@@ -110,9 +126,9 @@ public class MainActivity extends AppCompatActivity {
                     networkName.setText("null");
                     networkLevel.setText("null");
                     GPSnum.setText("null");
+                    wifiVal=false;
                     //Set checking for wifi to false
                     isCheckingWifiStrength = false;
-                    isCheckingGPS = false;
                     //remove the callback
                     wifiStrengthHandler.removeCallbacksAndMessages(null);
 
@@ -144,17 +160,38 @@ public class MainActivity extends AppCompatActivity {
                     networkName.setText(String.valueOf(rssi) + " dBm");
                     int level = WifiManager.calculateSignalLevel(rssi, 5);
                     networkLevel.setText(String.valueOf(level));
+
+                    wifiVal=true;
+                    if(gpsVal==true) {
+                        String dataToSave ="SSID: " + ssid + ", RSSI: " + rssi + " dBm, Level: " + level + "\n";
+                        saveDataToInternalStorage(dataToSave);
+                        gpsVal=false; //measurement is taken, set it back to false
+                    }
                 }
                 if (isCheckingWifiStrength) {
                     checkWifiStrength(); // Call itself again to update after a delay
                 }
             }
         }, 500); // Updating every 500 milliseconds
+
         locationListener = new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
-                GPSnum.setText("Lat: " + location.getLatitude() + ", Lon: " + location.getLongitude());
-                //Log.d("startState","value: "+ startState); //debug
+                if(startState == true) {
+                    //Get Timestamp:
+                    Date date = new Date();
+                    long timestamp = date.getTime();
+                    Log.d("Timestamp", "Current timestamp: " + timestamp);
+
+                    GPSnum.setText("Lat: " + location.getLatitude() + ", Lon: " + location.getLongitude());
+                    String dataToSave =  "unix time: " + String.valueOf(timestamp) + ", " + "Lat: " + location.getLatitude() + ", Lon: " + location.getLongitude() +", ";
+                    if(wifiVal==true) {
+                        saveDataToInternalStorage(dataToSave);
+                        Log.d("Saved Data", "values: " + dataToSave); //debug
+                        gpsVal=true; // set GPS value to true since data is measured
+                    }
+                    wifiVal = false;
+                }
             }
 
             @Override
@@ -166,5 +203,34 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onProviderDisabled(String provider) {}
         };
+    }
+
+
+    //Create the file name
+    private void fileCreate(){
+        if(startState==true) {
+            File directory = new File(getFilesDir(), "WIFI-MAP");
+            if (!directory.exists()) {
+                directory.mkdir();
+                Log.d("directory_State", "Directory Made!");
+            }
+            Log.d("directory_exists", "Directory Exists");
+            Date date2 = new Date();
+            long file_timestamp = date2.getTime();
+            Log.d("Timestamp", "Current timestamp: " + file_timestamp);
+            filename = String.valueOf(file_timestamp);
+        }
+    }
+
+    private void saveDataToInternalStorage(String data) {
+        try {
+            // Use MODE_APPEND to append data, or MODE_PRIVATE to overwrite existing data
+            FileOutputStream fos = openFileOutput(filename+".txt", MODE_APPEND);
+            fos.write(data.getBytes());
+            Log.d("directory_File", "Data Added to File");
+            fos.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
