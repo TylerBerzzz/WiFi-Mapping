@@ -13,6 +13,7 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.View;
 
 import android.widget.TextView;
@@ -33,13 +34,16 @@ public class MainActivity extends AppCompatActivity {
     //Handlers allows you to send and process Message and Runnable objects associated with a thread's MessageQueue
     private Handler wifiStrengthHandler = new Handler();
     private boolean isCheckingWifiStrength = false;
+
+    //Private boolean states
+    private boolean startState = false; //track the state of start/stop operation
     private boolean isCheckingGPS = false;
 
     //GPS Information Handlers
     @Override
     public void  onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == 1) {
+        if (requestCode == 1 && startState == true) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                     locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 500, 0, locationListener);
@@ -60,6 +64,7 @@ public class MainActivity extends AppCompatActivity {
         networkName = findViewById(R.id.networkRSSI); // Initialize the TextView
         networkLevel = findViewById(R.id.networkLevel); // Initialize the TextView
         GPSnum = findViewById(R.id.GPS); // Initialize the TextView
+        GPSnum.setVisibility(View.INVISIBLE);
 
         //Initialize GPS
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
@@ -76,6 +81,9 @@ public class MainActivity extends AppCompatActivity {
                 if (!isCheckingWifiStrength) {
                     isCheckingWifiStrength = true;
                     isCheckingGPS =  true;
+                    //Set GPS text to "Pending"
+                    GPSnum.setVisibility(View.VISIBLE);
+                    GPSnum.setText("Pending");
                     //If there is WiFi, check the strength
                     checkWifiStrength();
                     try {
@@ -85,6 +93,8 @@ public class MainActivity extends AppCompatActivity {
                     }
                     //Make a toast to show the user something happened
                     Toast.makeText(MainActivity.this, "Started WiFi check!", Toast.LENGTH_SHORT).show();
+                    //Change the button state to true
+                    startState = true;
 
                 }
 
@@ -94,20 +104,28 @@ public class MainActivity extends AppCompatActivity {
         stopButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                //Set all readouts to null
-                networkID.setText("null");
-                networkName.setText("null");
-                networkLevel.setText("null");
-                GPSnum.setText("null");
-                //Set checking for wifi to false
-                isCheckingWifiStrength = false;
-                isCheckingGPS = false;
-                //remove the callback
-                wifiStrengthHandler.removeCallbacksAndMessages(null);
+                if(startState == true){
+                    //Set all readouts to null
+                    networkID.setText("null");
+                    networkName.setText("null");
+                    networkLevel.setText("null");
+                    GPSnum.setText("null");
+                    //Set checking for wifi to false
+                    isCheckingWifiStrength = false;
+                    isCheckingGPS = false;
+                    //remove the callback
+                    wifiStrengthHandler.removeCallbacksAndMessages(null);
 
-                locationManager.removeUpdates(locationListener);
-                //Tell the user the process is stopped
-                Toast.makeText(MainActivity.this, "Stopped WiFi check!", Toast.LENGTH_SHORT).show();
+                    locationManager.removeUpdates(locationListener);
+                    GPSnum.setVisibility(View.INVISIBLE);
+                    //Tell the user the process is stopped
+                    Toast.makeText(MainActivity.this, "Stopped WiFi check!", Toast.LENGTH_SHORT).show();
+                    startState = false;
+                }
+                else{
+                    Toast.makeText(MainActivity.this, "Connect to WiFi First", Toast.LENGTH_SHORT).show();
+                }
+
             }
         });
         }
@@ -135,10 +153,8 @@ public class MainActivity extends AppCompatActivity {
         locationListener = new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
-                if(isCheckingGPS=true) {
-                    TextView gpsTextView = findViewById(R.id.GPS);
-                    gpsTextView.setText("Lat: " + location.getLatitude() + ", Lon: " + location.getLongitude());
-                }
+                GPSnum.setText("Lat: " + location.getLatitude() + ", Lon: " + location.getLongitude());
+                //Log.d("startState","value: "+ startState); //debug
             }
 
             @Override
